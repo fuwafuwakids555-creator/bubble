@@ -67,6 +67,12 @@
       font-size:24px !important;
     }
 
+    .yenBtn {
+      background:#ff9800;
+      color:white;
+      font-size:24px !important;
+    }
+
     .timeRow {
       display: flex;
       justify-content: center;
@@ -392,6 +398,20 @@ if ("serviceWorker" in navigator) {
     });
   }
 
+  function notifyYen10000() {
+    if (!confirm("一万円札の通知を送信しますか？")) return;
+
+    sendToSheet({
+      type: "yen10000",
+      ts: Date.now(),
+      device: DEVICE_NAME,
+      page: "ふわふわタイマー",
+      message: "一万円札が使用されました"
+    });
+
+    alert("通知を送信しました");
+  }
+
   function playAudioQueue() {
     if (audioQueue.length === 0) {
       isPlaying = false;
@@ -461,15 +481,23 @@ if ("serviceWorker" in navigator) {
 
     const refundDiv = document.createElement("div");
     refundDiv.className = "timer";
-
     refundDiv.innerHTML = `
       <button id="refundBtn" class="timerBtn refundBtn" onclick="refund500()">
         500円<br>返金
       </button>
       <p class="displayText">返金</p>
     `;
-
     container.appendChild(refundDiv);
+
+    const yenDiv = document.createElement("div");
+    yenDiv.className = "timer";
+    yenDiv.innerHTML = `
+      <button id="yen10000Btn" class="timerBtn yenBtn" onclick="notifyYen10000()">
+        一万円札
+      </button>
+      <p class="displayText">メール通知</p>
+    `;
+    container.appendChild(yenDiv);
   }
 
   function handleButton(num) {
@@ -659,6 +687,7 @@ if ("serviceWorker" in navigator) {
   window.showSales = showSales;
   window.hideSales = hideSales;
   window.refund500 = refund500;
+  window.notifyYen10000 = notifyYen10000;
 </script>
 </body>
 </html>
