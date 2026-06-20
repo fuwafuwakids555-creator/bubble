@@ -137,7 +137,7 @@ if ("serviceWorker" in navigator) {
 
 <body>
   <h1>バブルボール＆ふわふわ　タイマー</h1>
-
+  <h2 id="deviceLabel"></h2>
   <div id="controls">
     <label>タイマー数:</label>
     <select id="timerCount">
@@ -156,6 +156,9 @@ if ("serviceWorker" in navigator) {
     <input type="number" id="startNumber" value="1" min="1" max="999">
 
     <button id="createBtn" onclick="generateTimers()">個数確定</button>
+    <button onclick="changeDeviceName()">
+端末名変更
+</button>
   </div>
 
   <div id="timers"></div>
@@ -191,7 +194,13 @@ if ("serviceWorker" in navigator) {
 
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyT3SeO06Z5fpoZWbBZPmLrbEO88n7Dlx6vDhwwqJ5ZBIO-x7xSFAWKVXp88y6e_8d_aA/exec";
-  const DEVICE_NAME = "ふわふわタイマー";
+  let DEVICE_NAME =
+  localStorage.getItem("deviceName") ||
+  prompt("端末名を入力してください");
+
+if (DEVICE_NAME) {
+  localStorage.setItem("deviceName", DEVICE_NAME);
+}
   const SALES_PIN = "4181";
 
   let container;
@@ -672,7 +681,8 @@ if ("serviceWorker" in navigator) {
     loadTodayCountersFromDailyStats();
 
     generateTimers();
-
+     document.getElementById("deviceLabel").textContent =
+  "端末名：" + DEVICE_NAME;
     const summaryDateInput = document.getElementById("summaryDate");
     summaryDateInput.value = currentDateKey;
     updateDailySummaryView(currentDateKey);
@@ -681,6 +691,36 @@ if ("serviceWorker" in navigator) {
       updateDailySummaryView(summaryDateInput.value || currentDateKey);
     });
   });
+ function changeDeviceName() {
+
+  const name = prompt(
+    "端末名を入力してください",
+    DEVICE_NAME
+  );
+
+  if (!name) return;
+
+  DEVICE_NAME = name;
+
+  localStorage.setItem(
+    "deviceName",
+    DEVICE_NAME
+  );
+
+  document.getElementById("deviceLabel").textContent =
+    "端末名：" + DEVICE_NAME;
+
+  alert(
+    "端末名を変更しました\n\n" +
+    DEVICE_NAME
+  );
+}
+
+  alert(
+    "端末名を変更しました\n\n" +
+    DEVICE_NAME
+  );
+}
 
   window.generateTimers = generateTimers;
   window.handleButton = handleButton;
