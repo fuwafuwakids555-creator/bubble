@@ -691,7 +691,7 @@ if (DEVICE_NAME) {
       updateDailySummaryView(summaryDateInput.value || currentDateKey);
     });
   });
- function changeDeviceName() {
+function changeDeviceName() {
 
   const name = prompt(
     "端末名を入力してください",
@@ -716,13 +716,13 @@ if (DEVICE_NAME) {
   );
 }
 
-
   window.generateTimers = generateTimers;
   window.handleButton = handleButton;
   window.showSales = showSales;
   window.hideSales = hideSales;
   window.refund500 = refund500;
   window.notifyYen10000 = notifyYen10000;
+  window.changeDeviceName = changeDeviceName;
 </script>
 </body>
 </html>
