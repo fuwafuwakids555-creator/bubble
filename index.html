@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>バブルボール＆ふわふわ タイマー</title>
+  <style>
+    h1 { font-size: 26px; margin-bottom: 6px; }
+
+    #controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
+      font-size: 16px;
+    }
+
+    #timerCount, #startNumber {
+      font-size: 16px;
+      padding: 2px;
+      width: 70px;
+    }
+
+    #createBtn {
+      font-size: 16px;
+      padding: 5px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    #timers {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 15px;
+      width: 100%;
+      margin-top: 6px;
+    }
+
+    .timer { text-align: center; }
+
+    button.timerBtn {
+      width: 100%;
+      height: 70px;
+      font-size: 40px;
+      font-weight: bold;
+      border-radius: 16px;
+      cursor: pointer;
+      padding: 0;
+    }
+
+    .waiting  { background-color: blue; color: white; }
+    .running  { background-color: green; color: white; }
+    .finished { background-color: red; color: white; }
+
+    .timeRow {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 4px;
+      margin: 4px 0;
+    }
+
+    .timeRow label { font-size: 18px; }
+    .timeRow select { font-size: 18px; padding: 2px 4px; }
+
+    .displayText {
+      font-size: 18px;
+      margin-top: 2px;
+      font-weight: bold;
+    }
+
+    .displayUp {
+      font-size: 18px;
+      font-weight: bold;
+      margin-top: 2px;
+    }
+
+    @keyframes blink {
+      0% { color: red; }
+      50% { color: transparent; }
+      100% { color: red; }
+    }
+
+    .blink {
+      animation: blink 1s step-start infinite;
+      font-weight: bold;
+    }
+
+    #summary {
+      margin-top: 10px;
+      font-size: 16px;
+    }
+
+    #summary h2 {
+      font-size: 18px;
+      margin: 4px 0;
+    }
+
+    #dailySummary {
+      margin-top: 14px;
+      border-top: 1px solid #ccc;
+      padding-top: 8px;
+      font-size: 16px;
+    }
+
+    #dailySummary h2 {
+      font-size: 18px;
+      margin: 4px 0;
+    }
+
+    #dailySummary input[type=date] {
+      font-size: 14px;
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>バブルボール＆ふわふわ　タイマー</h1>
+
+  <div id="controls">
+    <label>タイマー数:</label>
+    <select id="timerCount">
+      <option value="10">10</option>
+      <option value="15">15</option>
+      <option value="20">20</option>
+      <option value="25">25</option>
+      <option value="30" selected>30</option>
+    </select>
+
+    <label>開始番号:</label>
+    <input type="number" id="startNumber" value="1" min="1" max="999">
+
+    <button id="createBtn" onclick="generateTimers()">個数確定</button>
+  </div>
+
+  <div id="timers"></div>
+
+  <div id="summary">
+    <h2>今日の履歴と売上</h2>
+    <p>10分：<span id="count10">0回</span>（売上：<span id="fee10">0円</span>）</p>
+    <p>20分：<span id="count20">0回</span>（売上：<span id="fee20">0円</span>）</p>
+    <p>30分：<span id="count30">0回</span>（売上：<span id="fee30">0円</span>）</p>
+    <h2>今日のキャンセル回数：<span id="cancelCount">0回</span></h2>
+    <h2>今日の売上合計：<span id="feeTotal">0円</span></h2>
+  </div>
+
+  <div id="dailySummary">
+    <h2>日付ごとの集計</h2>
+    <label>集計日：</label>
+    <input type="date" id="summaryDate">
+
+    <p>10分：<span id="sum10">0回</span>（売上：<span id="sumFee10">0円</span>）</p>
+    <p>20分：<span id="sum20">0回</span>（売上：<span id="sumFee20">0円</span>）</p>
+    <p>30分：<span id="sum30">0回</span>（売上：<span id="sumFee30">0円</span>）</p>
+    <p>キャンセル回数：<span id="sumCancel">0回</span></p>
+    <h2>その日の売上合計：<span id="sumFeeTotal">0円</span></h2>
+  </div>
+
+<script>
+  const GAS_URL = "ここにApps ScriptのウェブアプリURL";
+  const DEVICE_NAME = "ふわふわタイマー";
+
+  let container;
+
+  let intervals = {};
+  let afterIntervals = {};
+  let timeoutHandles = {};
+  let audioQueue = [];
+  let isPlaying = false;
+
+  let press10 = 0;
+  let press20 = 0;
+  let press30 = 0;
+  let cancelCount = 0;
+
+  let dailyStats = {};
+  let currentDateKey = "";
+
+  function getTodayKey() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  function yen(n) {
+    return Number(n).toLocaleString("ja-JP") + "円";
+  }
+
+  function getPrice(minutes) {
+    if (minutes === 10) return 500;
+    if (minutes === 20) return 500;
+    if (minutes === 30) return 1000;
+    return 0;
+  }
+
+  function getItemKey(minutes) {
+    if (minutes === 10) return "p10";
+    if (minutes === 20) return "p20";
+    if (minutes === 30) return "p30";
+    return "";
+  }
+
+  function sendToSheet(data) {
+    if (!GAS_URL || GAS_URL === "ここにApps ScriptのウェブアプリURL") {
+      console.log("GAS_URL未設定");
+      return;
+    }
+
+    fetch(GAS_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify(data)
+    }).catch(err => {
+      console.log("送信失敗", err);
+    });
+  }
+
+  function loadDailyStats() {
+    const saved = localStorage.getItem("bbTimerDailyStats");
+    if (!saved) {
+      dailyStats = {};
+      return;
+    }
+
+    try {
+      dailyStats = JSON.parse(saved) || {};
+    } catch (e) {
+      dailyStats = {};
+    }
+  }
+
+  function saveDailyStats() {
+    localStorage.setItem("bbTimerDailyStats", JSON.stringify(dailyStats));
+  }
+
+  function loadTodayCountersFromDailyStats() {
+    const data = dailyStats[currentDateKey];
+
+    if (data) {
+      press10 = data.press10 || 0;
+      press20 = data.press20 || 0;
+      press30 = data.press30 || 0;
+      cancelCount = data.cancel || 0;
+    } else {
+      press10 = 0;
+      press20 = 0;
+      press30 = 0;
+      cancelCount = 0;
+    }
+
+    updateCountersDisplay();
+  }
+
+  function syncTodayToDailyStats() {
+    if (!dailyStats[currentDateKey]) {
+      dailyStats[currentDateKey] = {
+        press10: 0,
+        press20: 0,
+        press30: 0,
+        cancel: 0
+      };
+    }
+
+    dailyStats[currentDateKey].press10 = press10;
+    dailyStats[currentDateKey].press20 = press20;
+    dailyStats[currentDateKey].press30 = press30;
+    dailyStats[currentDateKey].cancel = cancelCount;
+
+    saveDailyStats();
+  }
+
+  function updateCountersDisplay() {
+    document.getElementById("count10").textContent = press10 + "回";
+    document.getElementById("count20").textContent = press20 + "回";
+    document.getElementById("count30").textContent = press30 + "回";
+    document.getElementById("cancelCount").textContent = cancelCount + "回";
+
+    const fee10 = press10 * 500;
+    const fee20 = press20 * 500;
+    const fee30 = press30 * 1000;
+    const total = fee10 + fee20 + fee30;
+
+    document.getElementById("fee10").textContent = yen(fee10);
+    document.getElementById("fee20").textContent = yen(fee20);
+    document.getElementById("fee30").textContent = yen(fee30);
+    document.getElementById("feeTotal").textContent = yen(total);
+
+    const dateKey = document.getElementById("summaryDate")?.value || currentDateKey;
+    updateDailySummaryView(dateKey);
+  }
+
+  function updateDailySummaryView(dateKey) {
+    const data = dailyStats[dateKey] || {
+      press10: 0,
+      press20: 0,
+      press30: 0,
+      cancel: 0
+    };
+
+    const fee10 = data.press10 * 500;
+    const fee20 = data.press20 * 500;
+    const fee30 = data.press30 * 1000;
+    const total = fee10 + fee20 + fee30;
+
+    document.getElementById("sum10").textContent = data.press10 + "回";
+    document.getElementById("sum20").textContent = data.press20 + "回";
+    document.getElementById("sum30").textContent = data.press30 + "回";
+    document.getElementById("sumCancel").textContent = data.cancel + "回";
+
+    document.getElementById("sumFee10").textContent = yen(fee10);
+    document.getElementById("sumFee20").textContent = yen(fee20);
+    document.getElementById("sumFee30").textContent = yen(fee30);
+    document.getElementById("sumFeeTotal").textContent = yen(total);
+  }
+
+  function playAudioQueue() {
+    if (audioQueue.length === 0) {
+      isPlaying = false;
+      return;
+    }
+
+    if (isPlaying) return;
+
+    isPlaying = true;
+    const item = audioQueue.shift();
+    const audio = new Audio(item.file);
+
+    audio.play().catch(() => {
+      isPlaying = false;
+      setTimeout(playAudioQueue, 1000);
+    });
+
+    audio.onended = () => {
+      isPlaying = false;
+      setTimeout(playAudioQueue, 2000);
+    };
+  }
+
+  function enqueueAudio(num, file) {
+    audioQueue.push({ num: num, file: file });
+    if (!isPlaying) playAudioQueue();
+  }
+
+  function generateTimers() {
+    container = document.getElementById("timers");
+
+    Object.keys(intervals).forEach(k => clearInterval(intervals[k]));
+    Object.keys(afterIntervals).forEach(k => clearInterval(afterIntervals[k]));
+    Object.keys(timeoutHandles).forEach(k => {
+      timeoutHandles[k].forEach(id => clearTimeout(id));
+    });
+
+    intervals = {};
+    afterIntervals = {};
+    timeoutHandles = {};
+
+    container.innerHTML = "";
+
+    const count = parseInt(document.getElementById("timerCount").value, 10) || 0;
+    const start = parseInt(document.getElementById("startNumber").value, 10) || 1;
+
+    for (let i = 0; i < count; i++) {
+      const num = start + i;
+
+      const div = document.createElement("div");
+      div.className = "timer";
+
+      div.innerHTML = `
+        <button id="btn${num}" class="timerBtn waiting" data-status="waiting" onclick="handleButton(${num})">${num}</button>
+        <div class="timeRow">
+          <label>時間:</label>
+          <select id="time${num}">
+            <option value="600" selected>10分</option>
+            <option value="1200">20分</option>
+            <option value="1800">30分</option>
+          </select>
+        </div>
+        <p id="display${num}" class="displayText">未開始</p>
+      `;
+
+      container.appendChild(div);
+    }
+  }
+
+  function handleButton(num) {
+    const button = document.getElementById("btn" + num);
+    if (!button) return;
+
+    const status = button.getAttribute("data-status");
+
+    if (status === "waiting") {
+      startTimer(num);
+    } else if (status === "running") {
+      cancelTimer(num);
+    } else if (status === "finished") {
+      resetTimer(num);
+    }
+  }
+
+  function startTimer(num) {
+    const timeSelect = document.getElementById("time" + num);
+    const setTimeSec = parseInt(timeSelect.value, 10) || 0;
+    const minutes = setTimeSec / 60;
+    const price = getPrice(minutes);
+
+    if (minutes === 10) press10++;
+    if (minutes === 20) press20++;
+    if (minutes === 30) press30++;
+
+    updateCountersDisplay();
+    syncTodayToDailyStats();
+
+    sendToSheet({
+      device: DEVICE_NAME,
+      type: "timer",
+      itemKey: getItemKey(minutes),
+      itemName: minutes + "分",
+      amount: price,
+      totalAfter: price
+    });
+
+    const display = document.getElementById("display" + num);
+    const button = document.getElementById("btn" + num);
+
+    let time = setTimeSec;
+
+    button.className = "timerBtn running";
+    button.setAttribute("data-status", "running");
+    display.textContent = formatTime(time);
+
+    intervals[num] = setInterval(() => {
+      time--;
+      display.textContent = formatTime(time);
+
+      if (time <= 30 && time > 0) {
+        display.classList.add("blink");
+      } else {
+        display.classList.remove("blink");
+      }
+
+      if (time <= 0) {
+        clearInterval(intervals[num]);
+        intervals[num] = null;
+
+        display.textContent = "時間です！";
+        display.classList.remove("blink");
+        display.style.color = "red";
+
+        enqueueAudio(num, `${num}.wav`);
+
+        timeoutHandles[num] = [
+          setTimeout(() => enqueueAudio(num, `${num}.wav`), 30000),
+          setTimeout(() => enqueueAudio(num, `${num}.wav`), 60000)
+        ];
+
+        button.className = "timerBtn finished";
+        button.setAttribute("data-status", "finished");
+
+        let afterSec = 0;
+
+        afterIntervals[num] = setInterval(() => {
+          afterSec++;
+          display.innerHTML = `終了後:<br>${formatTime(afterSec)}`;
+          display.classList.add("displayUp");
+        }, 1000);
+      }
+    }, 1000);
+  }
+
+  function cancelTimer(num) {
+    if (intervals[num]) {
+      clearInterval(intervals[num]);
+      intervals[num] = null;
+    }
+
+    if (afterIntervals[num]) {
+      clearInterval(afterIntervals[num]);
+      afterIntervals[num] = null;
+    }
+
+    if (timeoutHandles[num]) {
+      timeoutHandles[num].forEach(id => clearTimeout(id));
+      timeoutHandles[num] = [];
+    }
+
+    const button = document.getElementById("btn" + num);
+    const display = document.getElementById("display" + num);
+
+    if (!button || !display) return;
+
+    button.className = "timerBtn waiting";
+    button.setAttribute("data-status", "waiting");
+
+    display.textContent = "未開始";
+    display.style.color = "black";
+    display.classList.remove("blink");
+    display.classList.remove("displayUp");
+
+    cancelCount++;
+
+    updateCountersDisplay();
+    syncTodayToDailyStats();
+
+    sendToSheet({
+      device: DEVICE_NAME,
+      type: "cancel",
+      itemKey: "cancel",
+      itemName: "キャンセル",
+      amount: 0,
+      totalAfter: 0
+    });
+
+    const sel = document.getElementById("time" + num);
+    if (sel) sel.value = "600";
+  }
+
+  function resetTimer(num) {
+    if (afterIntervals[num]) {
+      clearInterval(afterIntervals[num]);
+      afterIntervals[num] = null;
+    }
+
+    if (timeoutHandles[num]) {
+      timeoutHandles[num].forEach(id => clearTimeout(id));
+      timeoutHandles[num] = [];
+    }
+
+    const button = document.getElementById("btn" + num);
+    const display = document.getElementById("display" + num);
+
+    if (!button || !display) return;
+
+    button.className = "timerBtn waiting";
+    button.setAttribute("data-status", "waiting");
+
+    display.textContent = "未開始";
+    display.style.color = "black";
+    display.classList.remove("blink");
+    display.classList.remove("displayUp");
+
+    const sel = document.getElementById("time" + num);
+    if (sel) sel.value = "600";
+  }
+
+  function formatTime(seconds) {
+    seconds = Number(seconds) || 0;
+    if (seconds < 0) seconds = 0;
+
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+
+    return `${m}分${s}秒`;
+  }
+
+  window.addEventListener("load", () => {
+    container = document.getElementById("timers");
+
+    currentDateKey = getTodayKey();
+
+    loadDailyStats();
+    loadTodayCountersFromDailyStats();
+
+    generateTimers();
+
+    const summaryDateInput = document.getElementById("summaryDate");
+    summaryDateInput.value = currentDateKey;
+    updateDailySummaryView(currentDateKey);
+
+    summaryDateInput.addEventListener("change", () => {
+      updateDailySummaryView(summaryDateInput.value || currentDateKey);
+    });
+  });
+
+  window.generateTimers = generateTimers;
+  window.handleButton = handleButton;
+</script>
+</body>
+</html>
