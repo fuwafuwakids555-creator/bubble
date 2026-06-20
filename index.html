@@ -155,7 +155,7 @@ if ("serviceWorker" in navigator) {
   <div id="summary">
     <h2>今日の履歴と売上</h2>
 
-    <button id="refundBtn" onclick="refund500()">500円返金</button>
+    
 
     <p>10分：<span id="count10">0回</span>（売上：<span id="fee10">0円</span>）</p>
     <p>20分：<span id="count20">0回</span>（売上：<span id="fee20">0円</span>）</p>
@@ -454,6 +454,18 @@ if ("serviceWorker" in navigator) {
       `;
 
       container.appendChild(div);
+      const refundDiv = document.createElement("div");
+refundDiv.className = "timer";
+
+refundDiv.innerHTML = `
+  <button id="refundBtn" class="timerBtn" onclick="refund500()"
+    style="background:#b00020;color:white;font-size:24px;">
+    500円<br>返金
+  </button>
+  <p class="displayText">返金</p>
+`;
+
+container.appendChild(refundDiv);
     }
   }
 
