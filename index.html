@@ -138,6 +138,7 @@ if ("serviceWorker" in navigator) {
 <body>
   <h1>バブルボール＆ふわふわ　タイマー</h1>
   <h2 id="deviceLabel"></h2>
+
   <div id="controls">
     <label>タイマー数:</label>
     <select id="timerCount">
@@ -156,9 +157,7 @@ if ("serviceWorker" in navigator) {
     <input type="number" id="startNumber" value="1" min="1" max="999">
 
     <button id="createBtn" onclick="generateTimers()">個数確定</button>
-    <button onclick="changeDeviceName()">
-端末名変更
-</button>
+    <button onclick="changeDeviceName()">端末名変更</button>
   </div>
 
   <div id="timers"></div>
@@ -168,12 +167,10 @@ if ("serviceWorker" in navigator) {
 
   <div id="summary">
     <h2>今日の履歴と売上</h2>
-
     <p>10分：<span id="count10">0回</span>（売上：<span id="fee10">0円</span>）</p>
     <p>20分：<span id="count20">0回</span>（売上：<span id="fee20">0円</span>）</p>
     <p>30分：<span id="count30">0回</span>（売上：<span id="fee30">0円</span>）</p>
     <p>500円返金：<span id="refund500Count">0回</span>（返金：<span id="refund500Fee">0円</span>）</p>
-
     <h2>今日のキャンセル回数：<span id="cancelCount">0回</span></h2>
     <h2>今日の売上合計：<span id="feeTotal">0円</span></h2>
   </div>
@@ -188,19 +185,20 @@ if ("serviceWorker" in navigator) {
     <p>30分：<span id="sum30">0回</span>（売上：<span id="sumFee30">0円</span>）</p>
     <p>500円返金：<span id="sumRefund500">0回</span>（返金：<span id="sumRefund500Fee">0円</span>）</p>
     <p>キャンセル回数：<span id="sumCancel">0回</span></p>
-
     <h2>その日の売上合計：<span id="sumFeeTotal">0円</span></h2>
   </div>
 
 <script>
   const GAS_URL = "https://script.google.com/macros/s/AKfycbyT3SeO06Z5fpoZWbBZPmLrbEO88n7Dlx6vDhwwqJ5ZBIO-x7xSFAWKVXp88y6e_8d_aA/exec";
-  let DEVICE_NAME =
-  localStorage.getItem("deviceName") ||
-  prompt("端末名を入力してください");
 
-if (DEVICE_NAME) {
-  localStorage.setItem("deviceName", DEVICE_NAME);
-}
+  let DEVICE_NAME =
+    localStorage.getItem("deviceName") ||
+    prompt("端末名を入力してください");
+
+  if (DEVICE_NAME) {
+    localStorage.setItem("deviceName", DEVICE_NAME);
+  }
+
   const SALES_PIN = "4181";
 
   let container;
@@ -208,6 +206,7 @@ if (DEVICE_NAME) {
   let intervals = {};
   let afterIntervals = {};
   let timeoutHandles = {};
+
   let audioQueue = [];
   let isPlaying = false;
 
@@ -422,31 +421,47 @@ if (DEVICE_NAME) {
   }
 
   function playAudioQueue() {
+    if (isPlaying) return;
+
     if (audioQueue.length === 0) {
       isPlaying = false;
       return;
     }
 
-    if (isPlaying) return;
-
     isPlaying = true;
+
     const item = audioQueue.shift();
     const audio = new Audio(item.file);
 
-    audio.play().catch(() => {
-      isPlaying = false;
-      setTimeout(playAudioQueue, 1000);
-    });
-
     audio.onended = () => {
-      isPlaying = false;
-      setTimeout(playAudioQueue, 2000);
+      setTimeout(() => {
+        isPlaying = false;
+        playAudioQueue();
+      }, 1000);
     };
+
+    audio.onerror = () => {
+      setTimeout(() => {
+        isPlaying = false;
+        playAudioQueue();
+      }, 1000);
+    };
+
+    audio.play().catch(() => {
+      setTimeout(() => {
+        isPlaying = false;
+        playAudioQueue();
+      }, 1000);
+    });
   }
 
   function enqueueAudio(num, file) {
-    audioQueue.push({ num: num, file: file });
-    if (!isPlaying) playAudioQueue();
+    audioQueue.push({
+      num: num,
+      file: file
+    });
+
+    playAudioQueue();
   }
 
   function generateTimers() {
@@ -461,6 +476,10 @@ if (DEVICE_NAME) {
     intervals = {};
     afterIntervals = {};
     timeoutHandles = {};
+
+    audioQueue = [];
+    isPlaying = false;
+
     container.innerHTML = "";
 
     const count = parseInt(document.getElementById("timerCount").value, 10) || 0;
@@ -556,6 +575,8 @@ if (DEVICE_NAME) {
     button.className = "timerBtn running";
     button.setAttribute("data-status", "running");
     display.textContent = formatTime(time);
+    display.style.color = "black";
+    display.classList.remove("displayUp");
 
     intervals[num] = setInterval(() => {
       time--;
@@ -575,15 +596,19 @@ if (DEVICE_NAME) {
         display.classList.remove("blink");
         display.style.color = "red";
 
+        button.className = "timerBtn finished";
+        button.setAttribute("data-status", "finished");
+
         enqueueAudio(num, `${num}.wav`);
 
         timeoutHandles[num] = [
-          setTimeout(() => enqueueAudio(num, `${num}.wav`), 30000),
-          setTimeout(() => enqueueAudio(num, `${num}.wav`), 60000)
+          setTimeout(() => {
+            const btn = document.getElementById("btn" + num);
+            if (btn && btn.getAttribute("data-status") === "finished") {
+              enqueueAudio(num, `${num}.wav`);
+            }
+          }, 180000)
         ];
-
-        button.className = "timerBtn finished";
-        button.setAttribute("data-status", "finished");
 
         let afterSec = 0;
 
@@ -672,6 +697,21 @@ if (DEVICE_NAME) {
     return `${m}分${s}秒`;
   }
 
+  function changeDeviceName() {
+    const name = prompt("端末名を入力してください", DEVICE_NAME);
+
+    if (!name) return;
+
+    DEVICE_NAME = name;
+
+    localStorage.setItem("deviceName", DEVICE_NAME);
+
+    document.getElementById("deviceLabel").textContent =
+      "端末名：" + DEVICE_NAME;
+
+    alert("端末名を変更しました\n\n" + DEVICE_NAME);
+  }
+
   window.addEventListener("load", () => {
     container = document.getElementById("timers");
 
@@ -681,8 +721,10 @@ if (DEVICE_NAME) {
     loadTodayCountersFromDailyStats();
 
     generateTimers();
-     document.getElementById("deviceLabel").textContent =
-  "端末名：" + DEVICE_NAME;
+
+    document.getElementById("deviceLabel").textContent =
+      "端末名：" + DEVICE_NAME;
+
     const summaryDateInput = document.getElementById("summaryDate");
     summaryDateInput.value = currentDateKey;
     updateDailySummaryView(currentDateKey);
@@ -691,30 +733,6 @@ if (DEVICE_NAME) {
       updateDailySummaryView(summaryDateInput.value || currentDateKey);
     });
   });
-function changeDeviceName() {
-
-  const name = prompt(
-    "端末名を入力してください",
-    DEVICE_NAME
-  );
-
-  if (!name) return;
-
-  DEVICE_NAME = name;
-
-  localStorage.setItem(
-    "deviceName",
-    DEVICE_NAME
-  );
-
-  document.getElementById("deviceLabel").textContent =
-    "端末名：" + DEVICE_NAME;
-
-  alert(
-    "端末名を変更しました\n\n" +
-    DEVICE_NAME
-  );
-}
 
   window.generateTimers = generateTimers;
   window.handleButton = handleButton;
