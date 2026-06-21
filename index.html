@@ -210,6 +210,7 @@ if ("serviceWorker" in navigator) {
   let audioQueue = [];
   let isPlaying = false;
 
+  let activeCallToken = {};
   let press10 = 0;
   let press20 = 0;
   let press30 = 0;
@@ -421,16 +422,22 @@ if ("serviceWorker" in navigator) {
   }
 
   function playAudioQueue() {
-    if (isPlaying) return;
+  if (isPlaying) return;
 
-    if (audioQueue.length === 0) {
-      isPlaying = false;
-      return;
+  while (audioQueue.length > 0) {
+    const item = audioQueue.shift();
+
+    if (activeCallToken[item.num] !== item.token) {
+      continue;
+    }
+
+    const btn = document.getElementById("btn" + item.num);
+    if (!btn || btn.getAttribute("data-status") !== "finished") {
+      continue;
     }
 
     isPlaying = true;
 
-    const item = audioQueue.shift();
     const audio = new Audio(item.file);
 
     audio.onended = () => {
@@ -453,16 +460,22 @@ if ("serviceWorker" in navigator) {
         playAudioQueue();
       }, 1000);
     });
+
+    return;
   }
 
-  function enqueueAudio(num, file) {
-    audioQueue.push({
-      num: num,
-      file: file
-    });
+  isPlaying = false;
+}
 
-    playAudioQueue();
-  }
+  function enqueueAudio(num, file, token) {
+  audioQueue.push({
+    num: num,
+    file: file,
+    token: token
+  });
+
+  playAudioQueue();
+}
 
   function generateTimers() {
     container = document.getElementById("timers");
@@ -599,16 +612,24 @@ if ("serviceWorker" in navigator) {
         button.className = "timerBtn finished";
         button.setAttribute("data-status", "finished");
 
-        enqueueAudio(num, `${num}.wav`);
+        const callToken = Date.now() + "_" + num;
+activeCallToken[num] = callToken;
 
-        timeoutHandles[num] = [
-          setTimeout(() => {
-            const btn = document.getElementById("btn" + num);
-            if (btn && btn.getAttribute("data-status") === "finished") {
-              enqueueAudio(num, `${num}.wav`);
-            }
-          }, 180000)
-        ];
+enqueueAudio(num, `${num}.wav`, callToken);
+
+timeoutHandles[num] = [
+  setTimeout(() => {
+    const btn = document.getElementById("btn" + num);
+
+    if (
+      btn &&
+      btn.getAttribute("data-status") === "finished" &&
+      activeCallToken[num] === callToken
+    ) {
+      enqueueAudio(num, `${num}.wav`, callToken);
+    }
+  }, 180000)
+];
 
         let afterSec = 0;
 
@@ -636,6 +657,8 @@ if ("serviceWorker" in navigator) {
       timeoutHandles[num].forEach(id => clearTimeout(id));
       timeoutHandles[num] = [];
     }
+    activeCallToken[num] = null;
+audioQueue = audioQueue.filter(item => item.num !== num);
 
     const button = document.getElementById("btn" + num);
     const display = document.getElementById("display" + num);
@@ -669,6 +692,8 @@ if ("serviceWorker" in navigator) {
       timeoutHandles[num].forEach(id => clearTimeout(id));
       timeoutHandles[num] = [];
     }
+    activeCallToken[num] = null;
+audioQueue = audioQueue.filter(item => item.num !== num);
 
     const button = document.getElementById("btn" + num);
     const display = document.getElementById("display" + num);
