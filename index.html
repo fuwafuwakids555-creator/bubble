@@ -158,6 +158,11 @@ if ("serviceWorker" in navigator) {
 
     <button id="createBtn" onclick="generateTimers()">個数確定</button>
     <button onclick="changeDeviceName()">端末名変更</button>
+	<label>モード:</label>
+<select id="playMode" onchange="savePlayMode()">
+  <option value="fuwafuwa">ふわふわ</option>
+  <option value="bubble">バブルボール</option>
+</select>
   </div>
 
   <div id="timers"></div>
@@ -369,17 +374,25 @@ if ("serviceWorker" in navigator) {
   }
 
   function showSales() {
-    const pin = prompt("暗証番号を入力してください");
+  sendToSheet({
+    type: "sales_view",
+    ts: Date.now(),
+    device: DEVICE_NAME,
+    page: "ふわふわタイマー",
+    message: "売上を見るボタンが押されました"
+  });
 
-    if (pin !== SALES_PIN) {
-      alert("暗証番号が違います");
-      return;
-    }
+  const pin = prompt("暗証番号を入力してください");
 
-    document.getElementById("summary").style.display = "block";
-    document.getElementById("dailySummary").style.display = "block";
-    document.getElementById("hideSalesBtn").style.display = "inline-block";
+  if (pin !== SALES_PIN) {
+    alert("暗証番号が違います");
+    return;
   }
+
+  document.getElementById("summary").style.display = "block";
+  document.getElementById("dailySummary").style.display = "block";
+  document.getElementById("hideSalesBtn").style.display = "inline-block";
+}
 
   function hideSales() {
     document.getElementById("summary").style.display = "none";
@@ -408,18 +421,16 @@ if ("serviceWorker" in navigator) {
   }
 
   function notifyYen10000() {
-    if (!confirm("一万円札の通知を送信しますか？")) return;
+  sendToSheet({
+    type: "yen10000",
+    ts: Date.now(),
+    device: DEVICE_NAME,
+    page: "ふわふわタイマー",
+    message: "一万円札が使用されました"
+  });
 
-    sendToSheet({
-      type: "yen10000",
-      ts: Date.now(),
-      device: DEVICE_NAME,
-      page: "ふわふわタイマー",
-      message: "一万円札が使用されました"
-    });
-
-    alert("通知を送信しました");
-  }
+  alert("一万円札通知を送信しました");
+}
 
   function playAudioQueue() {
   if (isPlaying) return;
@@ -515,6 +526,21 @@ if ("serviceWorker" in navigator) {
           </select>
         </div>
         <p id="display${num}" class="displayText">未開始</p>
+	<button
+  onclick="callNumber(${num})"
+  style="
+    margin-top:6px;
+    width:100%;
+    height:40px;
+    font-size:18px;
+    background:#ff9800;
+    color:white;
+    border:none;
+    border-radius:10px;
+    font-weight:bold;
+">
+🔊 呼び出し
+</button>
       `;
 
       container.appendChild(div);
@@ -615,7 +641,7 @@ if ("serviceWorker" in navigator) {
         const callToken = Date.now() + "_" + num;
 activeCallToken[num] = callToken;
 
-enqueueAudio(num, `${num}.wav`, callToken);
+playEndAudio(num, callToken);
 
 timeoutHandles[num] = [
   setTimeout(() => {
@@ -626,7 +652,7 @@ timeoutHandles[num] = [
       btn.getAttribute("data-status") === "finished" &&
       activeCallToken[num] === callToken
     ) {
-      enqueueAudio(num, `${num}.wav`, callToken);
+      playEndAudio(num, callToken);
     }
   }, 180000)
 ];
@@ -642,6 +668,51 @@ timeoutHandles[num] = [
     }, 1000);
   }
 
+   function callNumber(num){
+
+  const btn = event.target;
+
+  btn.disabled = true;
+  btn.style.background = "#4CAF50";
+  btn.innerHTML = "🔊 呼び出し中";
+
+  const audio = new Audio(`${num}.wav`);
+
+  audio.play();
+
+  audio.onended = () => {
+    btn.disabled = false;
+    btn.style.background = "#ff9800";
+    btn.innerHTML = "🔊 呼び出し";
+  };
+
+  audio.onerror = () => {
+    btn.disabled = false;
+    btn.style.background = "#ff9800";
+    btn.innerHTML = "🔊 呼び出し";
+  };
+
+}
+
+	function playEndAudio(num, callToken) {
+  const mode = document.getElementById("playMode").value;
+  const messageFile = mode === "bubble" ? "bubble.wav" : "fuwafuwa.wav";
+
+  enqueueAudio(num, `${num}.wav`, callToken);
+  setTimeout(() => {
+    const btn = document.getElementById("btn" + num);
+
+    if (
+      btn &&
+      btn.getAttribute("data-status") === "finished" &&
+      activeCallToken[num] === callToken
+    ) {
+      const audio = new Audio(messageFile);
+      audio.play().catch(err => console.log(err));
+    }
+  }, 2500);
+}
+		
   function cancelTimer(num) {
     if (intervals[num]) {
       clearInterval(intervals[num]);
@@ -737,6 +808,10 @@ audioQueue = audioQueue.filter(item => item.num !== num);
     alert("端末名を変更しました\n\n" + DEVICE_NAME);
   }
 
+	function savePlayMode() {
+  const mode = document.getElementById("playMode").value;
+  localStorage.setItem("playMode", mode);
+}
   window.addEventListener("load", () => {
     container = document.getElementById("timers");
 
@@ -746,6 +821,9 @@ audioQueue = audioQueue.filter(item => item.num !== num);
     loadTodayCountersFromDailyStats();
 
     generateTimers();
+
+	const savedMode = localStorage.getItem("playMode") || "fuwafuwa";
+document.getElementById("playMode").value = savedMode;
 
     document.getElementById("deviceLabel").textContent =
       "端末名：" + DEVICE_NAME;
@@ -766,6 +844,7 @@ audioQueue = audioQueue.filter(item => item.num !== num);
   window.refund500 = refund500;
   window.notifyYen10000 = notifyYen10000;
   window.changeDeviceName = changeDeviceName;
+  window.callNumber = callNumber;
 </script>
 </body>
 </html>
