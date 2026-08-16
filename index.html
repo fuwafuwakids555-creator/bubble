@@ -110,6 +110,7 @@
 
     .refundBtn { background:#b00020; color:white; font-size:24px !important; }
     .yenBtn { background:#ff9800; color:white; font-size:24px !important; }
+    .ownerBtn { background:#673ab7; color:white; font-size:21px !important; }
 
     .timeRow {
       display:flex;
@@ -600,6 +601,32 @@ function notifyYen10000() {
   }, 1200);
 }
 
+function notifyOwner() {
+  const btn = document.getElementById("ownerCallBtn");
+
+  if (btn) {
+    btn.innerHTML = "送信中";
+    btn.disabled = true;
+  }
+
+  // 一万円札ボタンと同じ通知ルートを使い、
+  // 一万円札カウントには加算しない
+  sendToSheet({
+    type:"yen10000",
+    ts:Date.now(),
+    device:DEVICE_NAME,
+    page:"ふわふわタイマー",
+    message:"オーナー呼び出しです"
+  });
+
+  setTimeout(() => {
+    if (btn) {
+      btn.innerHTML = "オーナー<br>呼び出し";
+      btn.disabled = false;
+    }
+  }, 1200);
+}
+
 /* =========================
    音声キュー
 ========================= */
@@ -993,6 +1020,14 @@ function generateTimers() {
     <p class="displayText">メール通知</p>
   `;
   container.appendChild(yenDiv);
+
+  const ownerDiv = document.createElement("div");
+  ownerDiv.className = "timer";
+  ownerDiv.innerHTML = `
+    <button id="ownerCallBtn" class="timerBtn ownerBtn" onclick="notifyOwner()">オーナー<br>呼び出し</button>
+    <p class="displayText">メール通知</p>
+  `;
+  container.appendChild(ownerDiv);
 
   restoreVisibleTimers(start, count);
 }
@@ -1516,6 +1551,7 @@ window.showSales = showSales;
 window.hideSales = hideSales;
 window.refund500 = refund500;
 window.notifyYen10000 = notifyYen10000;
+window.notifyOwner = notifyOwner;
 window.changeDeviceName = changeDeviceName;
 window.savePlayMode = savePlayMode;
 window.callNumber = callNumber;
