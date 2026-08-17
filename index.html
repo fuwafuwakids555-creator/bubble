@@ -612,7 +612,7 @@ function notifyOwner() {
   // 一万円札ボタンと同じ通知ルートを使い、
   // 一万円札カウントには加算しない
   sendToSheet({
-    type:"yen10000",
+    type:"owner_call",
     ts:Date.now(),
     device:DEVICE_NAME,
     page:"ふわふわタイマー",
