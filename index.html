@@ -111,6 +111,7 @@
     .refundBtn { background:#b00020; color:white; font-size:24px !important; }
     .yenBtn { background:#ff9800; color:white; font-size:24px !important; }
     .ownerBtn { background:#673ab7; color:white; font-size:21px !important; }
+    .changeBtn { background:#00897b; color:white; font-size:21px !important; }
 
     .timeRow {
       display:flex;
@@ -627,6 +628,32 @@ function notifyOwner() {
   }, 1200);
 }
 
+
+function notifyChange() {
+  const btn = document.getElementById("changeCallBtn");
+
+  if (btn) {
+    btn.innerHTML = "送信中";
+    btn.disabled = true;
+  }
+
+  // GAS側で change_call はオーナー1だけへLINE通知
+  sendToSheet({
+    type:"change_call",
+    ts:Date.now(),
+    device:DEVICE_NAME,
+    page:"ふわふわタイマー",
+    message:"両替の呼び出しです"
+  });
+
+  setTimeout(() => {
+    if (btn) {
+      btn.innerHTML = "両替";
+      btn.disabled = false;
+    }
+  }, 1200);
+}
+
 /* =========================
    音声キュー
 ========================= */
@@ -1017,15 +1044,23 @@ function generateTimers() {
   yenDiv.className = "timer";
   yenDiv.innerHTML = `
     <button id="yen10000Btn" class="timerBtn yenBtn" onclick="notifyYen10000()">一万円札</button>
-    <p class="displayText">メール通知</p>
+    <p class="displayText">LINE通知</p>
   `;
   container.appendChild(yenDiv);
+
+  const changeDiv = document.createElement("div");
+  changeDiv.className = "timer";
+  changeDiv.innerHTML = `
+    <button id="changeCallBtn" class="timerBtn changeBtn" onclick="notifyChange()">両替</button>
+    <p class="displayText">LINE通知</p>
+  `;
+  container.appendChild(changeDiv);
 
   const ownerDiv = document.createElement("div");
   ownerDiv.className = "timer";
   ownerDiv.innerHTML = `
     <button id="ownerCallBtn" class="timerBtn ownerBtn" onclick="notifyOwner()">オーナー<br>呼び出し</button>
-    <p class="displayText">メール通知</p>
+    <p class="displayText">LINE通知</p>
   `;
   container.appendChild(ownerDiv);
 
@@ -1552,6 +1587,7 @@ window.hideSales = hideSales;
 window.refund500 = refund500;
 window.notifyYen10000 = notifyYen10000;
 window.notifyOwner = notifyOwner;
+window.notifyChange = notifyChange;
 window.changeDeviceName = changeDeviceName;
 window.savePlayMode = savePlayMode;
 window.callNumber = callNumber;
