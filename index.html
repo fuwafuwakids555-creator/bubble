@@ -297,6 +297,7 @@ function getItemKey(minutes) {
 /* =========================
    オフライン送信
 ========================= */
+
 function getOfflineQueue() {
   try {
     return JSON.parse(localStorage.getItem("offlineSendQueue") || "[]");
@@ -404,6 +405,7 @@ window.addEventListener("offline", updateNetworkStatus);
 /* =========================
    売上保存
 ========================= */
+
 function loadDailyStats() {
   try {
     dailyStats = JSON.parse(
@@ -610,8 +612,6 @@ function notifyOwner() {
     btn.disabled = true;
   }
 
-  // 一万円札ボタンと同じ通知ルートを使い、
-  // 一万円札カウントには加算しない
   sendToSheet({
     type:"owner_call",
     ts:Date.now(),
@@ -628,7 +628,6 @@ function notifyOwner() {
   }, 1200);
 }
 
-
 function notifyChange() {
   const btn = document.getElementById("changeCallBtn");
 
@@ -637,7 +636,6 @@ function notifyChange() {
     btn.disabled = true;
   }
 
-  // GAS側で change_call はオーナー1だけへLINE通知
   sendToSheet({
     type:"change_call",
     ts:Date.now(),
@@ -657,6 +655,7 @@ function notifyChange() {
 /* =========================
    音声キュー
 ========================= */
+
 function isStillFinished(num, token) {
   const btn = document.getElementById("btn" + num);
   const state = timerStates[num];
@@ -851,6 +850,7 @@ function callNumber(num, btn) {
 /* =========================
    タイマー・呼び出し予約
 ========================= */
+
 function clearTimerHandles(num) {
   if (intervals[num]) {
     clearInterval(intervals[num]);
@@ -1505,6 +1505,7 @@ function savePlayMode() {
 /* =========================
    起動・復帰
 ========================= */
+
 window.addEventListener("load", () => {
   currentDateKey = getTodayKey();
 
