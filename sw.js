@@ -1,265 +1,94 @@
-/* sw.js - ふわふわタイマー用 Service Worker
-   更新日：2026-08-26
-   timer.html と同じ場所に置いてください。
-*/
-
-const CACHE_NAME = "fuwafuwa-timer-cache-v20260826-2";
-
-const FILES_TO_CACHE = [
-  "./",
-  "./timer.html",
-  "./manifest.json",
-  "./sw.js",
-
-  "./1.wav", "./2.wav", "./3.wav", "./4.wav", "./5.wav",
-  "./6.wav", "./7.wav", "./8.wav", "./9.wav", "./10.wav",
-  "./11.wav", "./12.wav", "./13.wav", "./14.wav", "./15.wav",
-  "./16.wav", "./17.wav", "./18.wav", "./19.wav", "./20.wav",
-  "./21.wav", "./22.wav", "./23.wav", "./24.wav", "./25.wav",
-  "./26.wav", "./27.wav", "./28.wav", "./29.wav", "./30.wav",
-  "./31.wav", "./32.wav", "./33.wav", "./34.wav", "./35.wav",
-  "./36.wav", "./37.wav", "./38.wav", "./39.wav", "./40.wav",
-  "./41.wav", "./42.wav", "./43.wav", "./44.wav", "./45.wav",
-  "./46.wav", "./47.wav", "./48.wav", "./49.wav", "./50.wav",
-
-  "./ふわふわ.wav",
-  "./バブル.wav",
-  "./fuwafuwa.wav",
-  "./bubble.wav"
+/* sw.js - timer.html用。更新日：2026-10-10
+   timer.html、audio-fix.js、WAVと同じフォルダに配置してください。 */
+const SHELL = 'bb-timer-shell-v20261010-2';
+const AUDIO = 'bb-timer-audio-v20261010'; // audio-fix.jsと一致させる
+const ROOT = new URL('./', self.registration.scope).href;
+const TIMER = new URL('timer.html', ROOT).href;
+const PATCH = new URL('audio-fix.js', ROOT).href;
+const AUDIO_FILES = [
+  ...Array.from({length:50}, (_, i) => `${i + 1}.wav`),
+  'bubble.wav', 'fuwafuwa.wav', 'バブル.wav', 'ふわふわ.wav'
 ];
 
-self.addEventListener("install", event => {
+function completeAudio(response) {
+  return response && response.ok && response.status !== 206
+    && !/text\/html/i.test(response.headers.get('content-type') || '');
+}
 
-  self.skipWaiting();
+async function preserveAudio(file, cache, oldKeys) {
+  const url = new URL(file, ROOT).href;
+  // Retain old offline audio before trying to update it from the network.
+  if (!await cache.match(url)) {
+    for (const key of oldKeys) {
+      const old = await (await caches.open(key)).match(url);
+      if (completeAudio(old)) { await cache.put(url, old); break; }
+    }
+  }
+  try {
+    const response = await fetch(new Request(url, {cache:'reload'}));
+    if (completeAudio(response)) await cache.put(url, response);
+  } catch (_) { /* Missing optional audio must not cancel installation. */ }
+}
 
-  event.waitUntil(
-
-    caches.open(CACHE_NAME).then(async cache => {
-
-      for (const file of FILES_TO_CACHE) {
-
-        try {
-
-          await cache.add(file);
-
-        } catch (e) {
-
-          console.log(
-            "cache skip:",
-            file
-          );
-
-        }
-
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(SHELL);
+    // These two files are essential. Do not activate an incomplete update.
+    await cache.addAll([new Request(TIMER, {cache:'reload'}), new Request(PATCH, {cache:'reload'})]);
+    for (const file of ['./','manifest.json']) {
+      try { await cache.add(new Request(new URL(file, ROOT).href, {cache:'reload'})); } catch (_) {}
+    }
+    const audioCache = await caches.open(AUDIO);
+    const oldKeys = (await caches.keys()).filter(k => k.startsWith('fuwafuwa-timer-cache-'));
+    // Four parallel downloads, rather than 54 simultaneous downloads.
+    for (let i = 0; i < AUDIO_FILES.length; i += 4) {
+      await Promise.all(AUDIO_FILES.slice(i, i + 4).map(file => preserveAudio(file, audioCache, oldKeys)));
+    }
+    await self.skipWaiting();
+  })());
+});
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    // Delete only our own obsolete shell. Preserve audio and other apps' caches.
+    await Promise.all(keys.filter(k => k.startsWith('bb-timer-shell-') && k !== SHELL).map(k => caches.delete(k)));
+    await self.clients.claim();
+  })());
+});
+self.addEventListener('fetch', event => {
+  const req = event.request;
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== self.location.origin || !url.href.startsWith(ROOT)) return;
+  // The patched Web Audio player reads full files from AUDIO directly.
+  // Leave partial media requests to the browser; never store a partial response.
+  if (req.headers.has('range')) return;
+  if (/\.wav$/i.test(url.pathname)) {
+    event.respondWith((async () => {
+      const cache = await caches.open(AUDIO);
+      const saved = await cache.match(req);
+      if (completeAudio(saved)) return saved;
+      try {
+        const response = await fetch(req);
+        if (completeAudio(response)) await cache.put(req, response.clone()).catch(() => {});
+        return response;
+      } catch (_) { return new Response('', {status:503}); }
+    })());
+    return;
+  }
+  event.respondWith((async () => {
+    const cache = await caches.open(SHELL);
+    try {
+      const response = await fetch(req);
+      if (response.ok) await cache.put(req, response.clone()).catch(() => {});
+      return response;
+    } catch (error) {
+      const saved = await cache.match(req);
+      if (saved) return saved;
+      if (req.mode === 'navigate') {
+        const home = await cache.match(TIMER);
+        if (home) return home;
       }
-
-    })
-
-  );
-
-});
-
-
-self.addEventListener("activate", event => {
-
-  event.waitUntil(
-
-    caches.keys().then(keys => {
-
-      return Promise.all(
-
-        keys
-
-          .filter(
-            key => key !== CACHE_NAME
-          )
-
-          .map(
-            key => caches.delete(key)
-          )
-
-      );
-
-    }).then(() => {
-
-      return self.clients.claim();
-
-    })
-
-  );
-
-});
-
-
-self.addEventListener("fetch", event => {
-
-  const request =
-    event.request;
-
-
-  if (
-    request.method !== "GET"
-  ) {
-
-    return;
-
-  }
-
-
-  const url =
-    new URL(
-      request.url
-    );
-
-
-  /* =====================================
-     外部URL
-  ===================================== */
-
-  if (
-    url.origin !==
-    self.location.origin
-  ) {
-
-    event.respondWith(
-
-      fetch(request)
-
-        .catch(() => {
-
-          return new Response(
-            "",
-            {
-              status: 503
-            }
-          );
-
-        })
-
-    );
-
-    return;
-
-  }
-
-
-  /* =====================================
-     HTML
-     ネットを優先して最新版を取得
-  ===================================== */
-
-  if (
-    request.mode === "navigate" ||
-    url.pathname.endsWith(".html")
-  ) {
-
-    event.respondWith(
-
-      fetch(request)
-
-        .then(response => {
-
-          const copy =
-            response.clone();
-
-
-          caches
-            .open(CACHE_NAME)
-            .then(cache => {
-
-              cache.put(
-                request,
-                copy
-              );
-
-            });
-
-
-          return response;
-
-        })
-
-        .catch(() => {
-
-          return caches
-            .match(
-              "./timer.html"
-            )
-            .then(cached => {
-
-              return (
-                cached ||
-                caches.match(
-                  "./index.html"
-                )
-              );
-
-            });
-
-        })
-
-    );
-
-    return;
-
-  }
-
-
-  /* =====================================
-     音声・manifest等
-     キャッシュ優先
-  ===================================== */
-
-  event.respondWith(
-
-    caches
-      .match(request)
-      .then(cached => {
-
-        if (cached) {
-
-          return cached;
-
-        }
-
-
-        return fetch(request)
-
-          .then(response => {
-
-            const copy =
-              response.clone();
-
-
-            caches
-              .open(CACHE_NAME)
-              .then(cache => {
-
-                cache.put(
-                  request,
-                  copy
-                );
-
-              });
-
-
-            return response;
-
-          })
-
-          .catch(() => {
-
-            return new Response(
-              "",
-              {
-                status: 404
-              }
-            );
-
-          });
-
-      })
-
-  );
-
+      throw error;
+    }
+  })());
 });
