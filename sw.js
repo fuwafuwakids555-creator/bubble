@@ -1,9 +1,9 @@
-/* sw.js - timer.html用。更新日：2026-10-10
-   timer.html、audio-fix.js、WAVと同じフォルダに配置してください。 */
+/* sw.js - index.html用。更新日：2026-10-10
+   index.html、audio-fix.js、WAVと同じフォルダに配置してください。 */
 const SHELL = 'bb-timer-shell-v20261010-2';
 const AUDIO = 'bb-timer-audio-v20261010'; // audio-fix.jsと一致させる
 const ROOT = new URL('./', self.registration.scope).href;
-const TIMER = new URL('timer.html', ROOT).href;
+const TIMER = new URL('index.html', ROOT).href;
 const PATCH = new URL('audio-fix.js', ROOT).href;
 const AUDIO_FILES = [
   ...Array.from({length:50}, (_, i) => `${i + 1}.wav`),
