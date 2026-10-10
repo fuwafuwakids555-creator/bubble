@@ -14,76 +14,6 @@
 
 <meta name="theme-color" content="#111111">
 
-/* 文字のはみ出し修正：2026-10-10 */
-button {
-  box-sizing: border-box;
-}
-
-/* 番号は大きいまま表示 */
-button.timerBtn {
-  min-height: 70px;
-  height: auto;
-  line-height: 1.2;
-  padding: 8px 2px;
-}
-
-/* 呼び出し：折り返さずに表示 */
-button.callBtn {
-  min-height: 40px;
-  height: auto;
-  padding: 8px 2px;
-  font-size: clamp(11px, 1.7vw, 18px);
-  line-height: 1.3;
-  white-space: nowrap;
-}
-
-/* 返金・一万円札・両替・オーナー */
-button.timerBtn.refundBtn,
-button.timerBtn.yenBtn,
-button.timerBtn.changeBtn,
-button.timerBtn.ownerBtn {
-  font-size: clamp(13px, 2vw, 21px) !important;
-  line-height: 1.4;
-  white-space: nowrap;
-}
-
-/* 「時間:」が縦に割れないように表示 */
-.timeRow {
-  flex-direction: column;
-  gap: 2px;
-}
-
-.timeRow label {
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-.timeRow select {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: 100px;
-  min-width: 0;
-  font-size: 16px;
-}
-
-/* スマートフォンなど幅が狭い画面 */
-@media (max-width: 600px) {
-  #timers {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 8px;
-  }
-
-  button.callBtn {
-    font-size: 13px;
-  }
-
-  button.timerBtn.refundBtn,
-  button.timerBtn.yenBtn,
-  button.timerBtn.changeBtn,
-  button.timerBtn.ownerBtn {
-    font-size: 16px !important;
-  }
-}
 
 <style>
 
@@ -174,7 +104,73 @@ if ('serviceWorker' in navigator) {
 }
 
 </script>
+<style>
+/* ボタン表示修正：2026-10-10 */
+button {
+  box-sizing: border-box;
+}
 
+button.timerBtn {
+  min-height: 70px;
+  height: auto;
+  line-height: 1.2;
+  padding: 8px 2px;
+}
+
+button.callBtn {
+  min-height: 40px;
+  height: auto;
+  padding: 8px 2px;
+  font-size: clamp(11px, 1.7vw, 18px);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+button.timerBtn.refundBtn,
+button.timerBtn.yenBtn,
+button.timerBtn.changeBtn,
+button.timerBtn.ownerBtn {
+  font-size: clamp(13px, 2vw, 21px) !important;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.timeRow {
+  flex-direction: column;
+  gap: 2px;
+}
+
+.timeRow label {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.timeRow select {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100px;
+  min-width: 0;
+  font-size: 16px;
+}
+
+@media (max-width: 600px) {
+  #timers {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  button.callBtn {
+    font-size: 13px;
+  }
+
+  button.timerBtn.refundBtn,
+  button.timerBtn.yenBtn,
+  button.timerBtn.changeBtn,
+  button.timerBtn.ownerBtn {
+    font-size: 16px !important;
+  }
+}
+</style>
 </head>
 
 <body>
