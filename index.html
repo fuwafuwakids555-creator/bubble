@@ -233,6 +233,15 @@ button.timerBtn.ownerBtn {
 
 <button id="deviceBtn" onclick="changeDeviceName()">端末名変更</button>
 
+<details><summary>料金設定（この端末）</summary>
+<form id="priceForm">
+<p><label>10分 <input id="price10" type="number" inputmode="numeric" min="0" step="1" required style="width:7em"> 円</label></p>
+<p><label>20分 <input id="price20" type="number" inputmode="numeric" min="0" step="1" required style="width:7em"> 円</label></p>
+<p><label>30分 <input id="price30" type="number" inputmode="numeric" min="0" step="1" required style="width:7em"> 円</label></p>
+<button type="submit">料金を保存</button>
+<span id="priceStatus" role="status"></span>
+</form></details>
+
 </div>
 
 <div id="timers"></div>
@@ -247,13 +256,14 @@ button.timerBtn.ownerBtn {
 
 <h2>今日の履歴と売上</h2>
 
+
 <p>10分：<span id="count10">0回</span>（売上：<span id="fee10">0円</span>）</p>
 
 <p>20分：<span id="count20">0回</span>（売上：<span id="fee20">0円</span>）</p>
 
 <p>30分：<span id="count30">0回</span>（売上：<span id="fee30">0円</span>）</p>
 
-<p>500円返金：<span id="refund500Count">0回</span>（返金：<span id="refund500Fee">0円</span>）</p>
+<p>返金：<span id="refund500Count">0回</span>（返金：<span id="refund500Fee">0円</span>）</p>
 
 <p>一万円札：<span id="yen10000Count">0回</span></p>
 
@@ -277,7 +287,7 @@ button.timerBtn.ownerBtn {
 
 <p>30分：<span id="sum30">0回</span>（売上：<span id="sumFee30">0円</span>）</p>
 
-<p>500円返金：<span id="sumRefund500">0回</span>（返金：<span id="sumRefund500Fee">0円</span>）</p>
+<p>返金：<span id="sumRefund500">0回</span>（返金：<span id="sumRefund500Fee">0円</span>）</p>
 
 <p>一万円札：<span id="sumYen10000">0回</span></p>
 
@@ -336,6 +346,7 @@ let press30 = 0;
 let cancelCount = 0;
 
 let refund500Count = 0;
+let refundTotal = 0;
 
 let yen10000Count = 0;
 
@@ -383,10 +394,47 @@ function yen(n) {
 
 }
 
-function getPrice(m) {
+const originalPrices = {10:500, 20:500, 30:1000};
+const durations = [10, 20, 30];
+let prices = readStored('bbTimerPrices', originalPrices);
+let revenue = {};
 
-  return m === 30 ? 1000 : (m === 10 || m === 20 ? 500 : 0);
+function getPrice(minutes) {
+  return prices[minutes] ?? originalPrices[minutes] ?? 0;
+}
 
+function storedRevenue(day, minutes) {
+  return day.revenue?.[minutes] ?? (day['press'+minutes] || 0) * originalPrices[minutes];
+}
+
+function storedRefund(day) {
+  return day.refundTotal ?? (day.refund500 || 0) * 500;
+}
+
+function refundLabel() {
+  return yen(getPrice(10)) + '<br>返金';
+}
+
+function setupPriceForm() {
+  const form = el('priceForm');
+  for (const minutes of durations) el('price'+minutes).value = getPrice(minutes);
+  form.oninput = () => setText('priceStatus', '');
+  form.onsubmit = event => {
+    event.preventDefault();
+    const next = {};
+    for (const minutes of durations) {
+      const value = el('price'+minutes).valueAsNumber;
+      if (!Number.isSafeInteger(value) || value < 0) {
+        setText('priceStatus', '0以上の整数を入力してください。');
+        return;
+      }
+      next[minutes] = value;
+    }
+    localStorage.setItem('bbTimerPrices', JSON.stringify(next));
+    prices = next;
+    if (el('refundBtn')) el('refundBtn').innerHTML = refundLabel();
+    setText('priceStatus', '保存しました。次の受付から適用します。');
+  };
 }
 
 function getItemKey(m) {
@@ -587,6 +635,7 @@ function loadTodayCountersFromDailyStats() {
 
   const d = dailyStats[currentDateKey] || {};
 
+  revenue = Object.fromEntries(durations.map(m => [m, storedRevenue(d,m)]));
   press10 = d.press10 || 0;
 
   press20 = d.press20 || 0;
@@ -595,6 +644,7 @@ function loadTodayCountersFromDailyStats() {
 
   cancelCount = d.cancel || 0;
 
+  refundTotal = storedRefund(d);
   refund500Count = d.refund500 || 0;
 
   yen10000Count = d.yen10000 || 0;
@@ -609,11 +659,12 @@ function syncTodayToDailyStats() {
 
   dailyStats[currentDateKey] = {
 
-    press10,press20,press30,
+    press10,press20,press30,revenue:{...revenue},
 
     cancel:cancelCount,
 
     refund500:refund500Count,
+    refundTotal,
 
     yen10000:yen10000Count
 
@@ -643,17 +694,17 @@ function updateCountersDisplay() {
 
   setText('yen10000Count',yen10000Count+'回');
 
-  setText('fee10',yen(press10*500));
+  setText('fee10',yen(revenue[10]));
 
-  setText('fee20',yen(press20*500));
+  setText('fee20',yen(revenue[20]));
 
-  setText('fee30',yen(press30*1000));
+  setText('fee30',yen(revenue[30]));
 
-  setText('refund500Fee','-'+yen(refund500Count*500));
+  setText('refund500Fee','-'+yen(refundTotal));
 
   setText('feeTotal',yen(
 
-    press10*500+press20*500+press30*1000-refund500Count*500
+    revenue[10]+revenue[20]+revenue[30]-refundTotal
 
   ));
 
@@ -685,15 +736,15 @@ function updateDailySummaryView(dateKey) {
 
   setText('sumYen10000',(d.yen10000||0)+'回');
 
-  setText('sumFee10',yen(a*500));
+  setText('sumFee10',yen(storedRevenue(d,10)));
 
-  setText('sumFee20',yen(b*500));
+  setText('sumFee20',yen(storedRevenue(d,20)));
 
-  setText('sumFee30',yen(c*1000));
+  setText('sumFee30',yen(storedRevenue(d,30)));
 
-  setText('sumRefund500Fee','-'+yen(r*500));
+  setText('sumRefund500Fee','-'+yen(storedRefund(d)));
 
-  setText('sumFeeTotal',yen(a*500+b*500+c*1000-r*500));
+  setText('sumFeeTotal',yen(storedRevenue(d,10)+storedRevenue(d,20)+storedRevenue(d,30)-storedRefund(d)));
 
 }
 
@@ -739,6 +790,8 @@ function refund500() {
 
   ensureCurrentDate();
 
+  const amount = getPrice(10);
+  refundTotal += amount;
   refund500Count++;
 
   syncTodayToDailyStats();
@@ -749,9 +802,9 @@ function refund500() {
 
     type:'sale',ts:Date.now(),device:DEVICE_NAME,
 
-    key:'refund500',name:'500円返金',
+    key:'refund500',name:yen(amount)+'返金',
 
-    unitPrice:-500,qty:1,subtotal:-500
+    unitPrice:-amount,qty:1,subtotal:-amount
 
   });
 
@@ -1081,7 +1134,7 @@ function generateTimers() {
 
   const extras = [
 
-    ['refundBtn','refundBtn','refund500()','500円<br>返金',''],
+    ['refundBtn','refundBtn','refund500()',refundLabel(),''],
 
     ['yen10000Btn','yenBtn','notifyYen10000()','一万円札',''],
 
@@ -1143,6 +1196,7 @@ function startTimer(num) {
 
   removeCallsForNumber(num);
 
+  if (durations.includes(minutes)) revenue[minutes] += price;
   if (minutes === 10) press10++;
 
   if (minutes === 20) press20++;
@@ -1464,6 +1518,7 @@ window.addEventListener('load', () => {
   loadDailyStats();
 
   loadTimerStates();
+  setupPriceForm();
 
   const count = localStorage.getItem('timerCount');
 
