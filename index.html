@@ -878,6 +878,7 @@ function notifyOwner() {
 }
 
 function notifyChange() {
+  if (!confirm('両替を依頼しますか？')) return;
 
   notifyButton('changeCallBtn','両替','change_call','両替の呼び出しです');
 
