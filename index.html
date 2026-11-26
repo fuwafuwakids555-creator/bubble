@@ -299,11 +299,13 @@ button.timerBtn.ownerBtn {
 
 <script>
 
-// 更新日：2026-10-10
+// 更新日：2026-11-26
 
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbyT3SeO06Z5fpoZWbBZPmLrbEO88n7Dlx6vDhwwqJ5ZBIO-x7xSFAWKVXp88y6e_8d_aA/exec';
 
 const SALES_PIN = '4181';
+
+const AUTO_REFUND_LIMIT_MS = 120000;
 
 const SECOND_CALL_DELAY_MS = 180000;
 
@@ -787,27 +789,24 @@ function hideSales() {
 }
 
 function refund500() {
-
-  ensureCurrentDate();
-
   const amount = getPrice(10);
+  if (!confirm(`${yen(amount)}の返金を記録しますか？`)) return;
+  recordRefund(amount);
+}
+
+function recordRefund(amount) {
+  ensureCurrentDate();
   refundTotal += amount;
   refund500Count++;
 
   syncTodayToDailyStats();
-
   updateCountersDisplay();
 
   sendToSheet({
-
     type:'sale',ts:Date.now(),device:DEVICE_NAME,
-
     key:'refund500',name:yen(amount)+'返金',
-
     unitPrice:-amount,qty:1,subtotal:-amount
-
   });
-
 }
 
 function notifyButton(id,label,type,message) {
@@ -845,6 +844,7 @@ function notifyButton(id,label,type,message) {
 }
 
 function notifyYen10000() {
+  if (!confirm('一万円札を1枚記録しますか？')) return;
 
   ensureCurrentDate();
 
@@ -865,6 +865,7 @@ function notifyYen10000() {
 }
 
 function notifyOwner() {
+  if (!confirm('責任者を呼び出しますか？')) return;
 
   notifyButton(
 
@@ -1184,13 +1185,15 @@ function handleButton(num) {
 
 function startTimer(num) {
 
-  ensureCurrentDate();
-
   const seconds = parseInt(el('time'+num).value,10) || 600;
 
   const minutes = seconds/60;
 
   const price = getPrice(minutes);
+  if (!confirm(`${num}番を${minutes}分・${yen(price)}で開始しますか？`)) return;
+
+  const startedAt = Date.now();
+  ensureCurrentDate();
 
   clearTimerHandles(num);
 
@@ -1217,13 +1220,11 @@ function startTimer(num) {
 
   });
 
-  const startedAt = Date.now();
-
   const endAt = startedAt+seconds*1000;
 
   timerStates[num] = {
 
-    status:'running',startedAt,endAt,
+    status:'running',startedAt,endAt,chargedAmount:price,
 
     selectedValue:String(seconds),finishedAt:null,token:null,
 
@@ -1468,17 +1469,36 @@ function resetTimer(num) {
 }
 
 function cancelTimer(num) {
+  const state = timerStates[num];
+  if (!state || state.status !== 'running') return;
+
+  // 停止ボタンを押した時点で2分以内かを判定する。
+  const elapsed = Date.now() - Number(state.startedAt);
+  const withinTwoMinutes = elapsed >= 0 && elapsed <= AUTO_REFUND_LIMIT_MS;
+  const amount = state.chargedAmount;
+  const autoRefund = withinTwoMinutes && Number.isSafeInteger(amount) && amount >= 0;
+
+  let message = `${num}番のタイマーをキャンセルしますか？`;
+  if (autoRefund) {
+    message += `\n${yen(amount)}の返金を自動で記録します。`;
+  } else if (withinTwoMinutes) {
+    message += '\n受付時の料金を確認できません。金額を確認して別途返金処理してください。';
+  } else {
+    message += '\n開始から2分を過ぎているため、自動返金はありません。';
+  }
+
+  if (!confirm(message)) return;
 
   resetTimer(num);
-
   ensureCurrentDate();
-
   cancelCount++;
 
-  syncTodayToDailyStats();
-
-  updateCountersDisplay();
-
+  if (autoRefund) {
+    recordRefund(amount);
+  } else {
+    syncTodayToDailyStats();
+    updateCountersDisplay();
+  }
 }
 
 function formatTime(seconds) {
