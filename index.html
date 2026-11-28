@@ -299,7 +299,7 @@ button.timerBtn.ownerBtn {
 
 <script>
 
-// 更新日：2026-11-26
+// 更新日：2026-11-28
 
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbyT3SeO06Z5fpoZWbBZPmLrbEO88n7Dlx6vDhwwqJ5ZBIO-x7xSFAWKVXp88y6e_8d_aA/exec';
 
@@ -1191,7 +1191,6 @@ function startTimer(num) {
   const minutes = seconds/60;
 
   const price = getPrice(minutes);
-  if (!confirm(`${num}番を${minutes}分・${yen(price)}で開始しますか？`)) return;
 
   const startedAt = Date.now();
   ensureCurrentDate();
@@ -1488,7 +1487,10 @@ function cancelTimer(num) {
     message += '\n開始から2分を過ぎているため、自動返金はありません。';
   }
 
-  if (!confirm(message)) return;
+  if (autoRefund && !confirm(message)) return;
+  if (withinTwoMinutes && !autoRefund) {
+    alert("受付時の料金を確認できません。金額を確認して別途返金処理してください。");
+  }
 
   resetTimer(num);
   ensureCurrentDate();
